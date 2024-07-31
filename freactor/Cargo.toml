@@ -7,7 +7,7 @@ description = "A lightweight framework for asynchronous execution flow."
 license = "MIT"
 repository = "https://github.com/Pro-YY/freactor-rs.git"
 homepage = "https://github.com/Pro-YY/freactor-rs"
-readme = "README.md"
+readme = "../README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
