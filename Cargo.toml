@@ -1,0 +1,6 @@
+[workspace]
+members = [ "freactor",
+    "freactor",
+    "freactor-examples",
+]
+resolver = "2"
