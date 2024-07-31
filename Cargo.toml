@@ -1,6 +1,3 @@
 [workspace]
-members = [ "freactor",
-    "freactor",
-    "freactor-examples",
-]
+members = [ "freactor", "freactor-examples" ]
 resolver = "2"
