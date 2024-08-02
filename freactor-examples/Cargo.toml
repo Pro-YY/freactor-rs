@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-freactor = {path = "../freactor", features = ["tracing"] }
+freactor = {path = "../freactor", version = "0.1", features = ["tracing"] }
 # freactor = {path = "../freactor", features = [] }
 tokio = { version = "1.0", features = ["full"] }
 tracing = { version = "0.1.37" }
