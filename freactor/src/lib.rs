@@ -94,7 +94,7 @@ impl Freactor {
     pub async fn run(&self, task_name: &str, states: Arc<Mutex<State>>) -> Result<(), Box<dyn Error + Send>> {
         let tc = match self.flow_config.get(task_name) {
             Some(v) => {
-                info!("start task: {}", task_name);
+                debug!("start task: {}", task_name);
                 v
             }
             None => {
@@ -143,7 +143,7 @@ impl Freactor {
                 }
             }
         }
-        info!("finish task: {}", task_name);
+        debug!("finish task: {}", task_name);
         Ok(())
     }
 }
@@ -157,7 +157,7 @@ pub fn version() -> String {
         features.push("tracing".to_string());
     }
     let v = format!("version: {}, features: {:?}", version, features);
-    debug!("features: {}", v);
+    info!("features: {}", v);
     v
 }
 
