@@ -3,7 +3,7 @@
 use tracing::{info, warn, error, debug};
 
 #[cfg(not(feature = "tracing"))]
-use log::{info, warn, debug};
+use log::{info, warn, error, debug};
 
 use serde_json::Value;
 use serde::Deserialize;
