@@ -1,11 +1,12 @@
 //
 #[cfg(feature = "tracing")]
-use tracing::{info, warn, debug};
+use tracing::{info, warn, error, debug};
 
 #[cfg(not(feature = "tracing"))]
 use log::{info, warn, debug};
 
 use serde_json::Value;
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::error::Error;
 use std::future::Future;
@@ -30,9 +31,8 @@ pub enum Code {
 
 #[derive(Debug)]
 pub struct State {
-    pub id: u32,
     pub data: HashMap<String, Value>,
-    pub ctx: Option<HashMap<String, Value>>,    // TODO meta, retry, path, current, id
+    pub meta: Option<HashMap<String, Value>>,    // TODO meta, retry, path, current, id
 }
 
 
@@ -51,21 +51,25 @@ where
 
 /* Step Config */
 
+#[derive(Deserialize, Debug)]
 pub struct StepConfig {
     pub edges: Vec<String>,
     pub retry: Option<RetryConfig>,
 }
 
+#[derive(Deserialize, Debug)]
 pub struct RetryConfig {
     // interval: u32,
     // max_retries: u32,
     // exp_backoff: bool,
 }
 
+#[derive(Deserialize, Debug)]
 pub struct TaskConfig {
     pub config: HashMap<String, StepConfig>,
     pub init_step: String,
 }
+
 pub type FlowConfig = HashMap<String, TaskConfig>;
 
 
@@ -78,16 +82,26 @@ pub struct Freactor {
 }
 
 impl Freactor {
-    pub fn new(funcs: HashMap<String, BoxAsyncFn>, step_config: FlowConfig) -> Self {
+    pub fn new(func_map: Vec<(String, BoxAsyncFn)>, flow_config_str: String) -> Self {
+        let funcs: HashMap<String, BoxAsyncFn> = func_map.iter().cloned().collect();
+        let flow_config: FlowConfig = serde_json::from_str(&flow_config_str).unwrap();
         Self {
             funcs: Arc::new(funcs),
-            flow_config: Arc::new(step_config)
+            flow_config: Arc::new(flow_config)
         }
     }
 
     pub async fn run(&self, task_name: &str, states: Arc<Mutex<State>>) -> Result<(), Box<dyn Error + Send>> {
-        info!("run steps: {}", task_name);
-        let tc = self.flow_config.get(task_name).unwrap();
+        let tc = match self.flow_config.get(task_name) {
+            Some(v) => {
+                info!("start task: {}", task_name);
+                v
+            }
+            None => {
+                error!("no such task: {}", task_name);
+                return Ok(())
+            }
+        };
         let v = states;
         let mut current_step_name = &tc.init_step;
         let mut current_step = self.funcs.get(current_step_name).unwrap().clone();
@@ -129,7 +143,6 @@ impl Freactor {
                 }
             }
         }
-
         info!("finish task: {}", task_name);
         Ok(())
     }

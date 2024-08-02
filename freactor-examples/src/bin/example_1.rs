@@ -5,7 +5,6 @@ use tracing_subscriber;
 use std::sync::{Arc, Mutex};
 use tokio::task::JoinSet;
 use serde_json::{Value, json};
-use std::collections::HashMap;
 
 use reqwest;
 
@@ -13,13 +12,18 @@ use freactor::{
     Code,
     State,
     box_async_fn,
-    StepConfig,
-    TaskConfig,
-    FlowConfig,
     Freactor,
     version,
 };
 
+
+fn add_x(state: Arc<Mutex<State>>, x: i64) {
+    let mut s = state.lock().unwrap();
+    if let Some(value) = s.data.get_mut("value") {
+        let v = value.as_i64().unwrap() + x as i64;
+        *value = Value::Number(serde_json::Number::from(v));
+    }
+}
 
 async fn r1(state: Arc<Mutex<State>>) -> Result<Code, Box<dyn Error + Send>> {
     info!("r1 processing...");
@@ -36,24 +40,21 @@ async fn r1(state: Arc<Mutex<State>>) -> Result<Code, Box<dyn Error + Send>> {
     let ip = json["ip"].as_str().unwrap_or("Unknown IP");
     println!("IP Address: {}", ip);
 
-    let v;
-    {
-        let mut s = state.lock().unwrap();
-        s.id += 1;
-        v = s.id;
-    }
-    info!("r1 done! {}", v);
+    add_x(state.clone(), 1);
+    let s = state.lock().unwrap();
+    info!("r1 done with: {:?}", s.data.get("value").unwrap());
     Ok(Code::Success)
     // Ok(FrtCode::Retry(Some("What?".to_string())))
     // Ok(FrtCode::Failure(1, Some("Whoo".to_string())))
 }
 
+
 async fn r2(state: Arc<Mutex<State>>) -> Result<Code, Box<dyn Error + Send>> {
     info!("r2 processing...");
 	time::sleep(time::Duration::from_secs(1)).await;
-    let mut s = state.lock().unwrap();
-    s.id += 2;
-    info!("r2 done! {}", s.id);
+    add_x(state.clone(), 2);
+    let s = state.lock().unwrap();
+    info!("r2 done with: {:?}", s.data.get("value").unwrap());
     Ok(Code::Success)
     // Ok(FrtCode::Failure(1, Some("Whoo".to_string())))
 }
@@ -73,27 +74,27 @@ async fn r3(state: Arc<Mutex<State>>) -> Result<Code, Box<dyn Error + Send>> {
     let ip = json["ip"].as_str().unwrap_or("Unknown IP");
     println!("IP Address: {}", ip);
 
-    let mut s = state.lock().unwrap();
-    s.id += 3;
-    info!("r3 done! {}", s.id);
+    add_x(state.clone(), 3);
+    let s = state.lock().unwrap();
+    info!("r3 done with: {:?}", s.data.get("value").unwrap());
     Ok(Code::Success)
 }
 
 async fn r4(state: Arc<Mutex<State>>) -> Result<Code, Box<dyn Error + Send>> {
     info!("r4 processing...");
 	time::sleep(time::Duration::from_secs(1)).await;
-    let mut s = state.lock().unwrap();
-    s.id += 4;
-    info!("r4 done! {}", s.id);
+    add_x(state.clone(), 4);
+    let s = state.lock().unwrap();
+    info!("r4 done with: {:?}", s.data.get("value").unwrap());
     Ok(Code::Success)
 }
 
 async fn r5(state: Arc<Mutex<State>>) -> Result<Code, Box<dyn Error + Send>> {
     info!("r5 processing...");
 	time::sleep(time::Duration::from_secs(1)).await;
-    let mut s = state.lock().unwrap();
-    s.id += 5;
-    info!("r5 done! {}", s.id);
+    add_x(state.clone(), 5);
+    let s = state.lock().unwrap();
+    info!("r5 done with: {:?}", s.data.get("value").unwrap());
     // Ok(FrtCode::Success)
     Ok(Code::Failure(1, Some("Whoo".to_string())))
 }
@@ -101,9 +102,9 @@ async fn r5(state: Arc<Mutex<State>>) -> Result<Code, Box<dyn Error + Send>> {
 async fn r6(state: Arc<Mutex<State>>) -> Result<Code, Box<dyn Error + Send>> {
     info!("r6 processing...");
 	time::sleep(time::Duration::from_secs(1)).await;
-    let mut s = state.lock().unwrap();
-    s.id += 6;
-    info!("r6 done! {}", s.id);
+    add_x(state.clone(), 6);
+    let s = state.lock().unwrap();
+    info!("r6 done with: {:?}", s.data.get("value").unwrap());
     Ok(Code::Success)
 }
 
@@ -119,60 +120,55 @@ async fn sleeper(id: i32) {
 async fn run() {
     sleeper(0).await;
 
-    // TODO loadfrom config
-    let mut flow_config: FlowConfig = HashMap::new();
-    flow_config.insert("ExampleTask1".to_string(), TaskConfig { init_step: "r1".to_string(), config: HashMap::new()});
-    for (k, v) in &flow_config {
-        info!("{}:starts with #{}",k, v.init_step);
+    let flow_config = r#"
+    {
+        "ExampleTask1": {
+            "init_step": "r1",
+            "config": {
+                "r1": { "edges": ["r2", "r3", "r4"]},
+                "r2": { "edges": ["r5", "r3"]},
+                "r3": { "edges": ["r6", "r4"]},
+                "r4": { "edges": []},
+                "r5": { "edges": ["r6", "r3"]},
+                "r6": { "edges": [], "retry": null}
+            }
+        }
     }
+    "#.to_string();
 
-    let tc = flow_config.get_mut("ExampleTask1").unwrap();
-    // let scm = &mut tc.config;
-    tc.config.insert("r1".to_string(),
-        StepConfig {edges: vec!["r2".to_string(), "r3".to_string(), "r4".to_string()], retry: None});
-    tc.config.insert("r2".to_string(),
-        StepConfig {edges: vec!["r5".to_string(), "r3".to_string()], retry: None});
-    tc.config.insert("r3".to_string(),
-        StepConfig {edges: vec!["r6".to_string(), "r4".to_string()], retry: None});
-    tc.config.insert("r4".to_string(),
-        StepConfig {edges: vec![], retry: None});
-    tc.config.insert("r5".to_string(),
-        StepConfig {edges: vec!["r6".to_string(), "r3".to_string()], retry: None});
-    tc.config.insert("r6".to_string(),
-        StepConfig {edges: vec![], retry: None});
+    // let flow_config = r#"
+    // {
+    //     "ExampleTask1": {
+    //         "init_step": "r1",
+    //         "config": {
+    //             "r1": { "edges": []}
+    //         }
+    //     }
+    // }
+    // "#.to_string();
 
-
-    let scm = &tc.config;
-    for (k, v) in scm.into_iter() {
-        info!("{}, {:?}", k, v.edges);
-    }
-
-    let funcs: HashMap<String, _> = [
+    let func_map = vec![
         ("r1".to_string(), box_async_fn(r1)),
         ("r2".to_string(), box_async_fn(r2)),
         ("r3".to_string(), box_async_fn(r3)),
         ("r4".to_string(), box_async_fn(r4)),
         ("r5".to_string(), box_async_fn(r5)),
         ("r6".to_string(), box_async_fn(r6)),
-    ].iter().cloned().collect();
-    let f = Freactor::new(funcs, flow_config); // move by design
+    ];
+    let f = Freactor::new(func_map, flow_config); // ownership moved by design
 
     let shared_vecs: Vec<Arc<Mutex<State>>> = vec![
-        Arc::new(Mutex::new(State{id: 0, data: vec![
-            ("k1".to_string(), json!(10)),
-            // ("k2".to_string(), json!("abc")),
-            // ("k3".to_string(), json!({"array": [1,2,3], "object": {"a": 1, "b": "hello"}})),
-        ].into_iter().collect(), ctx: None})),
+        Arc::new(Mutex::new(State{data: vec![("value".to_string(), json!(0))].into_iter().collect(), meta: None})),
         // multi instance concurrently
-        Arc::new(Mutex::new(State{id: 1, data: HashMap::new(), ctx: None})),
-        Arc::new(Mutex::new(State{id: 2, data: HashMap::new(), ctx: None})),
-        Arc::new(Mutex::new(State{id: 3, data: HashMap::new(), ctx: None})),
-        // Arc::new(Mutex::new(State{id: 4, data: HashMap::new(), ctx: None})),
-        // Arc::new(Mutex::new(State{id: 5, data: HashMap::new(), ctx: None})),
-        // Arc::new(Mutex::new(State{id: 6, data: HashMap::new(), ctx: None})),
-        // Arc::new(Mutex::new(State{id: 7, data: HashMap::new(), ctx: None})),
-        // Arc::new(Mutex::new(State{id: 8, data: HashMap::new(), ctx: None})),
-        // Arc::new(Mutex::new(State{id: 9, data: HashMap::new(), ctx: None})),
+        Arc::new(Mutex::new(State{data: vec![("value".to_string(), json!(1))].into_iter().collect(), meta: None})),
+        Arc::new(Mutex::new(State{data: vec![("value".to_string(), json!(2))].into_iter().collect(), meta: None})),
+        Arc::new(Mutex::new(State{data: vec![("value".to_string(), json!(3))].into_iter().collect(), meta: None})),
+        Arc::new(Mutex::new(State{data: vec![("value".to_string(), json!(4))].into_iter().collect(), meta: None})),
+        Arc::new(Mutex::new(State{data: vec![("value".to_string(), json!(5))].into_iter().collect(), meta: None})),
+        Arc::new(Mutex::new(State{data: vec![("value".to_string(), json!(6))].into_iter().collect(), meta: None})),
+        Arc::new(Mutex::new(State{data: vec![("value".to_string(), json!(7))].into_iter().collect(), meta: None})),
+        Arc::new(Mutex::new(State{data: vec![("value".to_string(), json!(8))].into_iter().collect(), meta: None})),
+        Arc::new(Mutex::new(State{data: vec![("value".to_string(), json!(9))].into_iter().collect(), meta: None})),
     ];
 
     let mut jset = JoinSet::new();
@@ -185,8 +181,8 @@ async fn run() {
                 fc.run("ExampleTask1", v).await;
         });
     }
-    while let Some(res) = jset.join_next().await {
-        info!("{:?}", res);
+    while let Some(_res) = jset.join_next().await {
+        // info!("{:?}", res);
     }
 
     // print outcome
