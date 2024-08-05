@@ -5,6 +5,17 @@
 
 A lightweight framework for asynchronous execution flow in Rust.
 
+## Table of Contents
+
+- [Description](#description)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Examples](#examples)
+- [API Reference](#api-reference)
+- [Contributing](#contributing)
+- [License](#license)
+- [Contact](#contact)
+
 ## Description
 
 Freactor is a lightweight and flexible framework designed to manage and execute asynchronous flows in Rust. It provides an easy-to-use API to define and execute asynchronous tasks, making it ideal for building complex workflows and state machines.
@@ -75,17 +86,22 @@ Here are some examples to illustrate how to use freactor for different scenarios
 /* To be continued */
 ```
 
-**Example 3: Database Integration**
-```
-/* To be continued */
-```
+
+## API Reference
+
+For detailed API reference, please visit [docs.rs](https://docs.rs/freactor/latest/freactor/).
 
 ## Contributing
 
-Welcome contributions from the community! Please read our CONTRIBUTING guide to learn how you can help.
+Welcome contributions from the community! Please read our [CONTRIBUTING](CONTRIBUTING.md) guide to learn how you can help.
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ## Contact
 
 If you have any questions, feel free to reach out:
-    - GitHub: https://github.com/Pro-YY
-    - Email: paulyyangyang@gmail.com
+
+- GitHub: https://github.com/Pro-YY
+- Email: paulyyangyang@gmail.com
