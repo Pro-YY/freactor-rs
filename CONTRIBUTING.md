@@ -12,7 +12,7 @@ git clone https://github.com/Pro-YY/freactor.git
 cd freactor
 ```
 
-3. Create a Branch: Create a new branch for your changes.
+3. **Create a Branch**: Create a new branch for your changes.
 ```bash
 git checkout -b my-feature-branch
 ```
