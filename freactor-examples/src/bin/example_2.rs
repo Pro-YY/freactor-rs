@@ -4,8 +4,13 @@ use tracing::{info, debug};
 use tracing_subscriber;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use tokio::task::JoinSet;
 use serde_json::{Value, json};
+
+use axum::{
+    extract::Extension,
+    routing::get,
+    Router,
+};
 
 use reqwest;
 
@@ -31,7 +36,7 @@ fn print_state(state: Arc<Mutex<State>>, fn_name: &str) {
     debug!("{} done with: {:?}, [{:?}]", fn_name, s.data.get("value").unwrap(), thread::current().id());
 }
 
-async fn fetch_my_ip() -> Result<(), Box<dyn Error + Send>>{
+async fn _fetch_my_ip() -> Result<(), Box<dyn Error + Send>>{
     let response = reqwest::get("https://ipinfo.io")
     .await
     .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
@@ -49,7 +54,7 @@ async fn r1(state: Arc<Mutex<State>>) -> Result<Code, Box<dyn Error + Send>> {
     debug!("r1 processing...{:?}", thread::current().id());
 	time::sleep(time::Duration::from_secs(1)).await;
 
-    fetch_my_ip().await?;
+    // fetch_my_ip().await?;
     add_x(state.clone(), 1);
     print_state(state, "r1");
 
@@ -61,7 +66,7 @@ async fn r1(state: Arc<Mutex<State>>) -> Result<Code, Box<dyn Error + Send>> {
 
 async fn r2(state: Arc<Mutex<State>>) -> Result<Code, Box<dyn Error + Send>> {
     debug!("r2 processing...{:?}", thread::current().id());
-	time::sleep(time::Duration::from_secs(1)).await;
+	// time::sleep(time::Duration::from_secs(1)).await;
 
     add_x(state.clone(), 2);
     print_state(state, "r2");
@@ -72,7 +77,7 @@ async fn r2(state: Arc<Mutex<State>>) -> Result<Code, Box<dyn Error + Send>> {
 
 async fn r3(state: Arc<Mutex<State>>) -> Result<Code, Box<dyn Error + Send>> {
     debug!("r3 processing...{:?}", thread::current().id());
-	time::sleep(time::Duration::from_secs(1)).await;
+	// time::sleep(time::Duration::from_secs(1)).await;
 
     // fetch_my_ip().await?;
     add_x(state.clone(), 3);
@@ -83,7 +88,7 @@ async fn r3(state: Arc<Mutex<State>>) -> Result<Code, Box<dyn Error + Send>> {
 
 async fn r4(state: Arc<Mutex<State>>) -> Result<Code, Box<dyn Error + Send>> {
     debug!("r4 processing...{:?}", thread::current().id());
-	time::sleep(time::Duration::from_secs(1)).await;
+	// time::sleep(time::Duration::from_secs(1)).await;
 
     add_x(state.clone(), 4);
     print_state(state, "r4");
@@ -93,7 +98,7 @@ async fn r4(state: Arc<Mutex<State>>) -> Result<Code, Box<dyn Error + Send>> {
 
 async fn r5(state: Arc<Mutex<State>>) -> Result<Code, Box<dyn Error + Send>> {
     debug!("r5 processing...{:?}", thread::current().id());
-	time::sleep(time::Duration::from_secs(1)).await;
+	// time::sleep(time::Duration::from_secs(1)).await;
 
     add_x(state.clone(), 5);
     print_state(state, "r5");
@@ -104,7 +109,7 @@ async fn r5(state: Arc<Mutex<State>>) -> Result<Code, Box<dyn Error + Send>> {
 
 async fn r6(state: Arc<Mutex<State>>) -> Result<Code, Box<dyn Error + Send>> {
     debug!("r6 processing...{:?}", thread::current().id());
-	time::sleep(time::Duration::from_secs(1)).await;
+	// time::sleep(time::Duration::from_secs(1)).await;
 
     add_x(state.clone(), 6);
     print_state(state, "r6");
@@ -119,6 +124,16 @@ async fn _sleeper(id: i32) {
     info!("{}:Awake!", id);
 }
 
+
+async fn root(Extension(f): Extension<Arc<Freactor>>) -> &'static str {
+    debug!("request comes!");
+    let v = Arc::new(Mutex::new(State {
+        data: vec![("value".to_string(), json!(0))].into_iter().collect(),
+        meta: None,
+    }));
+    let _ = f.run("ExampleTask1", v).await;
+    "Hello, World!"
+}
 
 async fn run() {
     let flow_config = r#"
@@ -148,33 +163,16 @@ async fn run() {
     ];
     let f = Freactor::new(func_map, flow_config); // ownership moved by design
 
-    // multi instance concurrently
-    let mut shared_vecs: Vec<Arc<Mutex<State>>> = Vec::with_capacity(10);
-    for i in 0..shared_vecs.capacity() {
-        let state = State {
-            data: vec![("value".to_string(), json!(i))].into_iter().collect(),
-            meta: None,
-        };
-        shared_vecs.push(Arc::new(Mutex::new(state)));
-    }
+    let shared_server_state = Arc::new(f);
+    let app = Router::new()
+    // `GET /` goes to `root`
+    .route("/", get(root))
+    .layer(Extension(shared_server_state));
 
-    let mut jset = JoinSet::new();
-    // concurrent
-    for v in shared_vecs.clone() {
-        // clone flow config for every spawn/req
-        let fc = f.clone();
-        jset.spawn(async move {
-            let _r =
-                fc.run("ExampleTask1", v).await;
-        });
-    }
-    while let Some(_res) = jset.join_next().await {}
+    // run our app with hyper, listening globally on port 3000
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    axum::serve(listener, app).await.unwrap();
 
-    // print outcome
-    for v in shared_vecs {
-        let vec = v.lock().unwrap();
-        info!("Mutated Vec: {:?}", *vec);
-    }
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
