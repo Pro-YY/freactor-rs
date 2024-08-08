@@ -1,10 +1,12 @@
 # Freactor
 
+[![Crates.io](https://img.shields.io/crates/v/freactor)](https://crates.io/crates/freactor)
+[![Docs.rs](https://docs.rs/freactor/badge.svg)](https://docs.rs/freactor/latest/freactor/)
+[![License](https://img.shields.io/crates/l/freactor)](LICENSE)
+[![Build Status](https://github.com/Pro-YY/freactor-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/Pro-YY/freactor-rs/actions/workflows/ci.yml)
+
 A lightweight framework for asynchronous execution flow in Rust, designed to be fast, reliable, scalable and easy-to-use.
 
-[![crates.io](https://img.shields.io/crates/v/freactor)](https://crates.io/crates/freactor)
-[![docs.rs](https://docs.rs/freactor/badge.svg)](https://docs.rs/freactor/latest/freactor/)
-[![license](https://img.shields.io/crates/l/freactor)](LICENSE)
 
 ## Table of Contents
 
