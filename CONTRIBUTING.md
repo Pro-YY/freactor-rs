@@ -8,7 +8,7 @@ Thank you for considering contributing to Freactor! We welcome contributions fro
 
 2. **Clone Your Fork**: Clone your forked repository to your local machine.
 ```bash
-git clone https://github.com/Pro-YY/freactor.git
+git clone https://github.com/Pro-YY/freactor-rs.git
 cd freactor
 ```
 

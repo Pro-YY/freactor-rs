@@ -2,9 +2,9 @@
 
 A lightweight framework for asynchronous execution flow in Rust, designed to be fast, reliable, scalable and easy-to-use.
 
-![Crates.io](https://img.shields.io/crates/v/freactor)
-![Docs.rs](https://docs.rs/freactor/badge.svg)
-![License](https://img.shields.io/crates/l/freactor)
+![crates.io](https://img.shields.io/crates/v/freactor)
+![docs.rs](https://docs.rs/freactor/badge.svg)
+![license](https://img.shields.io/crates/l/freactor)
 
 
 ## Table of Contents
@@ -68,7 +68,7 @@ async run () {
     let f = Freactor::new(func_map, flow_config);
 
     // 3. Prepare you workspace arc state, and run your flow later anywhere
-    let state = Arc::new(Mutex::new(State {...}))
+    let state = Arc::new(Mutex::new(State:new(YOUR_BUSINESS_DATA)))
     f.run("ExampleTask1", workspace_state).await;
 
 }
