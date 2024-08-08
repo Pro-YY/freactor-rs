@@ -1,9 +1,10 @@
 # Freactor
-![crates.io](https://img.shields.io/crates/v/freactor)
-![docs.rs](https://docs.rs/freactor/badge.svg)
-![license](https://img.shields.io/crates/l/freactor)
 
 A lightweight framework for asynchronous execution flow in Rust, designed to be fast, reliable, scalable and easy-to-use.
+
+[![crates.io](https://img.shields.io/crates/v/freactor)](https://crates.io/crates/freactor)
+[![docs.rs](https://docs.rs/freactor/badge.svg)](https://docs.rs/freactor/latest/freactor/)
+[![license](https://img.shields.io/crates/l/freactor)](LICENSE)
 
 ## Table of Contents
 
