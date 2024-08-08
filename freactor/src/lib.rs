@@ -1,17 +1,44 @@
-//
+use std::collections::HashMap;
+use std::error::Error;
+use std::fmt;
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
+
+use serde_json::Value;
+use serde::Deserialize;
+
 #[cfg(feature = "tracing")]
 use tracing::{info, warn, error, debug};
 
 #[cfg(not(feature = "tracing"))]
 use log::{info, warn, error, debug};
 
-use serde_json::Value;
-use serde::Deserialize;
-use std::collections::HashMap;
-use std::error::Error;
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::{Arc, Mutex};
+#[cfg(feature = "runtime-tokio")]
+use tokio::time::sleep;
+
+#[cfg(feature = "runtime-async-std")]
+use async_std::task::sleep;
+
+
+async fn async_sleep(seconds: u64) {
+    #[cfg(feature = "runtime-tokio")]
+    {
+        debug!("using tokio sleep!");
+        sleep(std::time::Duration::from_secs(seconds)).await;
+    }
+    #[cfg(feature = "runtime-async-std")]
+    {
+        debug!("using async-std sleep!");
+        sleep(std::time::Duration::from_secs(seconds)).await;
+    }
+    #[cfg(not(any(feature = "runtime-tokio", feature = "runtime-async-std")))]
+    {
+        eprintln!("Async runtime feature, i.e. \"runtime-tokio\" should be enabled! Thread sleep is for test purpose only!");
+        std::thread::sleep(std::time::Duration::from_secs(seconds));
+    }
+}
 
 
 // Define a type alias for a boxed future with a specific lifetime
@@ -29,10 +56,42 @@ pub enum Code {
 }
 
 
-#[derive(Debug)]
+// #[derive(Debug)]
 pub struct State {
     pub data: HashMap<String, Value>,
-    pub meta: Option<HashMap<String, Value>>,    // TODO meta, retry, path, current, id
+    meta: Meta,
+}
+
+
+#[derive(Debug)]
+pub struct Meta {
+    pub id: u64,
+    pub path: Vec<(String, u32)>,
+}
+
+
+impl State {
+    pub fn new(data: HashMap<String, Value>) -> Self {
+        State {
+            data: data,
+            meta: Meta { id: 0, path: vec![] },
+        }
+    }
+}
+
+impl fmt::Debug for State {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let path_string: String = self.meta.path
+            .iter()
+            .map(|(s, n)| if *n > 0 { format!("{}@{}", s, n) } else { s.clone() })
+            .collect::<Vec<String>>()
+            .join(" -> ");
+        let meta_string = format!("{}# {}", self.meta.id, path_string);
+        f.debug_struct("Task State")
+            .field("data", &self.data)
+            .field("meta", &meta_string)
+            .finish()
+    }
 }
 
 
@@ -75,10 +134,15 @@ pub type FlowConfig = HashMap<String, TaskConfig>;
 
 /* Executor */
 
+const DEFAULT_MAX_RETRY: u32 = 3;       // 3 retries
+const DEFAULT_RETRY_INTERVAL: u64 = 2;  // 2 seconds
+
+
 #[derive(Clone)]
 pub struct Freactor {
     pub funcs: Arc<HashMap<String, BoxAsyncFn>>, // mapping from func name to func, never change once created
     pub flow_config: Arc<FlowConfig>,   // step config that define the flow transfer like a graph, never change
+    id_counter: Arc<AtomicU64>,
 }
 
 impl Freactor {
@@ -87,7 +151,8 @@ impl Freactor {
         let flow_config: FlowConfig = serde_json::from_str(&flow_config_str).unwrap();
         Self {
             funcs: Arc::new(funcs),
-            flow_config: Arc::new(flow_config)
+            flow_config: Arc::new(flow_config),
+            id_counter: Arc::new(AtomicU64::new(0)),
         }
     }
 
@@ -105,8 +170,24 @@ impl Freactor {
         let v = states;
         let mut current_step_name = &tc.init_step;
         let mut current_step = self.funcs.get(current_step_name).unwrap().clone();
+        let mut retrying = false;
+        {
+            let mut v = v.lock().unwrap();
+            v.meta.id = self.next_id();
+        }
         loop {
             debug!("current step: {}", current_step_name);
+            debug!("state: {:?}", v);
+            // update meta
+            {
+                let mut v = v.lock().unwrap();
+                if retrying == false {
+                    v.meta.path.push((current_step_name.to_owned(), 0));
+                }
+                retrying = false;
+                debug!("current path: {:?}", v.meta.path);
+            }
+            // run current step and dispatch with code
             match current_step(v.clone()).await {
                 Ok(Code::Success) => {
                     debug!("#Success!");
@@ -132,6 +213,22 @@ impl Freactor {
                 }
                 Ok(Code::Retry(msg)) => {
                     debug!("#Retry! {}", msg.unwrap());
+                    let max_retry = DEFAULT_MAX_RETRY;
+                    let retry_interval = DEFAULT_RETRY_INTERVAL;
+                    {
+                        let mut v = v.lock().unwrap();
+                        let len = v.meta.path.len();
+                        let retried = v.meta.path[len-1].1;
+                        debug!("step `{}` has already retried {} time(s).", current_step_name, retried);
+                        if retried >= max_retry {
+                            debug!("step `{}` has already retried {} time(s). abort!", current_step_name, retried);
+                            break;
+                        }
+                        v.meta.path[len-1].1 = retried + 1;
+                    }
+                    debug!("retrying after {} second(s).", retry_interval);
+                    async_sleep(retry_interval).await;
+                    retrying = true;
                 }
                 Ok(Code::Cancel(msg)) => {
                     debug!("#Cancel! {}", msg.unwrap());
@@ -146,6 +243,10 @@ impl Freactor {
         debug!("finish task: {}", task_name);
         Ok(())
     }
+
+    fn next_id(&self) -> u64 {
+        self.id_counter.fetch_add(1, Ordering::SeqCst)
+    }
 }
 
 
@@ -155,6 +256,12 @@ pub fn version() -> String {
     let mut features = vec![];
     if cfg!(feature = "tracing") {
         features.push("tracing".to_string());
+    }
+    if cfg!(feature = "runtime-tokio") {
+        features.push("runtime-tokio".to_string());
+    }
+    if cfg!(feature = "runtime-async-std") {
+        features.push("runtime-async-std".to_string());
     }
     let v = format!("version: {}, features: {:?}", version, features);
     info!("features: {}", v);

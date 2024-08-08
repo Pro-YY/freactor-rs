@@ -59,20 +59,20 @@ async fn r1(state: Arc<Mutex<State>>) -> Result<Code, Box<dyn Error + Send>> {
     print_state(state, "r1");
 
     Ok(Code::Success)
-    // Ok(FrtCode::Retry(Some("What?".to_string())))
-    // Ok(FrtCode::Failure(1, Some("Whoo".to_string())))
+    // Ok(Code::Retry(Some("What?".to_string())))
+    // Ok(Code::Failure(1, Some("Whoo".to_string())))
 }
 
 
 async fn r2(state: Arc<Mutex<State>>) -> Result<Code, Box<dyn Error + Send>> {
     debug!("r2 processing...{:?}", thread::current().id());
-	// time::sleep(time::Duration::from_secs(1)).await;
+	time::sleep(time::Duration::from_secs(1)).await;
 
     add_x(state.clone(), 2);
     print_state(state, "r2");
 
     Ok(Code::Success)
-    // Ok(FrtCode::Failure(1, Some("Whoo".to_string())))
+    // Ok(Code::Failure(1, Some("Whoo".to_string())))
 }
 
 async fn r3(state: Arc<Mutex<State>>) -> Result<Code, Box<dyn Error + Send>> {
@@ -103,7 +103,7 @@ async fn r5(state: Arc<Mutex<State>>) -> Result<Code, Box<dyn Error + Send>> {
     add_x(state.clone(), 5);
     print_state(state, "r5");
 
-    // Ok(FrtCode::Success)
+    // Ok(Code::Success)
     Ok(Code::Failure(1, Some("Whoo".to_string())))
 }
 
@@ -127,10 +127,9 @@ async fn _sleeper(id: i32) {
 
 async fn root(Extension(f): Extension<Arc<Freactor>>) -> &'static str {
     debug!("request comes!");
-    let v = Arc::new(Mutex::new(State {
-        data: vec![("value".to_string(), json!(0))].into_iter().collect(),
-        meta: None,
-    }));
+    let v = Arc::new(Mutex::new(State::new(
+        vec![("value".to_string(), json!(0))].into_iter().collect()
+    )));
     let _ = f.run("ExampleTask1", v).await;
     "Hello, World!"
 }
