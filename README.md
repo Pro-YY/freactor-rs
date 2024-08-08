@@ -1,4 +1,8 @@
 # Freactor
+[<img alt="github" src="https://img.shields.io/badge/github-Pro-YY/freactor-rs?style=for-the-badge&labelColor=555555&logo=github" height="20">](https://github.com/Pro-YY/feactor-rs)
+[<img alt="crates.io" src="https://img.shields.io/crates/v/freactor.svg?style=for-the-badge&color=fc8d62&logo=rust" height="20">](https://crates.io/crates/freactor)
+[<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-freactor?style=for-the-badge&labelColor=555555&logo=docs.rs" height="20">](https://docs.rs/freactor)
+
 ![crates.io](https://img.shields.io/crates/v/freactor)
 ![docs.rs](https://docs.rs/freactor/badge.svg)
 ![License](https://img.shields.io/crates/l/freactor)
