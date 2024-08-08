@@ -2,6 +2,7 @@
 
 [![Crates.io](https://img.shields.io/crates/v/freactor?logo=rust)](https://crates.io/crates/freactor)
 [![Docs.rs](https://img.shields.io/badge/docs.rs-docs-blue?logo=docs.rs)](https://docs.rs/freactor/latest/freactor/)
+[![docs.rs](https://docs.rs/freactor/badge.svg)](https://docs.rs/freactor)
 [![Build Status](https://github.com/Pro-YY/freactor-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/Pro-YY/freactor-rs/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
