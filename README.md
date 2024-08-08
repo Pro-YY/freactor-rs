@@ -1,14 +1,15 @@
 # Freactor
+
+A lightweight framework for asynchronous execution flow in Rust, designed to be fast, reliable, scalable and easy-to-use.
+
 ![Crates.io](https://img.shields.io/crates/v/freactor)
 ![Docs.rs](https://docs.rs/freactor/badge.svg)
 ![License](https://img.shields.io/crates/l/freactor)
-[<img alt="rust" src="https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white" height="20">]()
 
-A lightweight framework for asynchronous execution flow in Rust.
 
 ## Table of Contents
 
-- [Description](#description)
+- [Overview](#overview)
 - [Installation](#installation)
 - [Usage](#usage)
 - [Examples](#examples)
@@ -17,7 +18,7 @@ A lightweight framework for asynchronous execution flow in Rust.
 - [License](#license)
 - [Contact](#contact)
 
-## Description
+## Overview
 
 Freactor is a lightweight and flexible framework designed to manage and execute asynchronous flows in Rust. It provides an easy-to-use API to define and execute asynchronous tasks, making it ideal for building complex workflows and state machines.
 
