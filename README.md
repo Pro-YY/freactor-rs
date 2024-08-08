@@ -1,7 +1,7 @@
 # Freactor
 
-[![Crates.io](https://img.shields.io/crates/v/freactor)](https://crates.io/crates/freactor)
-[![Docs.rs](https://docs.rs/freactor/badge.svg)](https://docs.rs/freactor/latest/freactor/)
+[![Crates.io](https://img.shields.io/crates/v/freactor?logo=rust)](https://crates.io/crates/freactor)
+[![Docs.rs](https://docs.rs/freactor/badge.svg?logo=docs.rs)](https://docs.rs/freactor/latest/freactor/)
 [![License](https://img.shields.io/crates/l/freactor)](LICENSE)
 [![Build Status](https://github.com/Pro-YY/freactor-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/Pro-YY/freactor-rs/actions/workflows/ci.yml)
 
