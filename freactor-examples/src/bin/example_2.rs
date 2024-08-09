@@ -130,19 +130,49 @@ async fn root(Extension(f): Extension<Arc<Freactor>>) -> &'static str {
     let v = Arc::new(Mutex::new(State::new(
         vec![("value".to_string(), json!(0))].into_iter().collect()
     )));
-    let _ = f.run("ExampleTask1", v).await;
+    let _ = f.run("Task1", v).await;
     "Hello, World!"
 }
+
+async fn handle_task_1(Extension(f): Extension<Arc<Freactor>>) -> &'static str {
+    debug!("request comes!");
+    let v = Arc::new(Mutex::new(State::new(
+        vec![("value".to_string(), json!(0))].into_iter().collect()
+    )));
+    let _ = f.run("Task1", v).await;
+    "Hello, World!"
+}
+
+async fn handle_task_2(Extension(f): Extension<Arc<Freactor>>) -> &'static str {
+    debug!("request comes!");
+    let v = Arc::new(Mutex::new(State::new(
+        vec![("value".to_string(), json!(0))].into_iter().collect()
+    )));
+    let _ = f.run("Task2", v).await;
+    "Hello, World!"
+}
+
 
 async fn run() {
     let flow_config = r#"
     {
-        "ExampleTask1": {
+        "Task1": {
             "init_step": "r1",
             "config": {
                 "r1": { "edges": ["r2", "r3", "r4"]},
                 "r2": { "edges": ["r5", "r3"]},
                 "r3": { "edges": ["r6", "r4"]},
+                "r4": { "edges": []},
+                "r5": { "edges": ["r6", "r3"]},
+                "r6": { "edges": [], "retry": null}
+            }
+        },
+        "Task2": {
+            "init_step": "r1",
+            "config": {
+                "r1": { "edges": ["r2", "r3", "r4"]},
+                "r2": { "edges": ["r5", "r3"]},
+                "r3": { "edges": ["r4", "r6"]},
                 "r4": { "edges": []},
                 "r5": { "edges": ["r6", "r3"]},
                 "r6": { "edges": [], "retry": null}
@@ -166,6 +196,8 @@ async fn run() {
     let app = Router::new()
     // `GET /` goes to `root`
     .route("/", get(root))
+    .route("/1", get(handle_task_1))
+    .route("/2", get(handle_task_2))
     .layer(Extension(shared_server_state));
 
     // run our app with hyper, listening globally on port 3000

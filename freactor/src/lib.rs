@@ -66,6 +66,7 @@ pub struct State {
 #[derive(Debug)]
 pub struct Meta {
     pub id: u64,
+    pub task: String,
     pub path: Vec<(String, u32)>,
 }
 
@@ -74,7 +75,7 @@ impl State {
     pub fn new(data: HashMap<String, Value>) -> Self {
         State {
             data: data,
-            meta: Meta { id: 0, path: vec![] },
+            meta: Meta { id: 0, task: "unspecified".to_string(), path: vec![] },
         }
     }
 }
@@ -86,7 +87,7 @@ impl fmt::Debug for State {
             .map(|(s, n)| if *n > 0 { format!("{}@{}", s, n) } else { s.clone() })
             .collect::<Vec<String>>()
             .join(" -> ");
-        let meta_string = format!("{}# {}", self.meta.id, path_string);
+        let meta_string = format!("{}#{}: {}", self.meta.task, self.meta.id, path_string);
         f.debug_struct("Task State")
             .field("data", &self.data)
             .field("meta", &meta_string)
@@ -113,14 +114,14 @@ where
 #[derive(Deserialize, Debug)]
 pub struct StepConfig {
     pub edges: Vec<String>,
-    pub retry: Option<RetryConfig>,
+    retry: Option<RetryPolicy>,
 }
 
 #[derive(Deserialize, Debug)]
-pub struct RetryConfig {
-    // interval: u32,
-    // max_retries: u32,
-    // exp_backoff: bool,
+struct RetryPolicy {
+    attempts: u32,
+    interval: u64,
+    strategy: Option<String>,   // like `exp_backoff`
 }
 
 #[derive(Deserialize, Debug)]
@@ -134,8 +135,8 @@ pub type FlowConfig = HashMap<String, TaskConfig>;
 
 /* Executor */
 
-const DEFAULT_MAX_RETRY: u32 = 3;       // 3 retries
-const DEFAULT_RETRY_INTERVAL: u64 = 2;  // 2 seconds
+const DEFAULT_RETRY_ATTEMPTS: u32 = 3;  // max retries
+const DEFAULT_RETRY_INTERVAL: u64 = 2;  // seconds for retry cooldown
 
 
 #[derive(Clone)]
@@ -174,6 +175,7 @@ impl Freactor {
         {
             let mut v = v.lock().unwrap();
             v.meta.id = self.next_id();
+            v.meta.task = task_name.to_string();
         }
         loop {
             debug!("current step: {}", current_step_name);
@@ -182,7 +184,7 @@ impl Freactor {
             {
                 let mut v = v.lock().unwrap();
                 if retrying == false {
-                    v.meta.path.push((current_step_name.to_owned(), 0));
+                    v.meta.path.push((current_step_name.to_string(), 0));
                 }
                 retrying = false;
                 debug!("current path: {:?}", v.meta.path);
@@ -213,19 +215,30 @@ impl Freactor {
                 }
                 Ok(Code::Retry(msg)) => {
                     debug!("#Retry! {}", msg.unwrap());
-                    let max_retry = DEFAULT_MAX_RETRY;
-                    let retry_interval = DEFAULT_RETRY_INTERVAL;
+                    // get retry policy of current step from config
+                    let current_retry_policy = &tc.config.get(current_step_name).unwrap().retry;
+                    let attempts = current_retry_policy.as_ref().map_or(DEFAULT_RETRY_ATTEMPTS, |r| r.attempts);
+                    let interval = current_retry_policy.as_ref().map_or(DEFAULT_RETRY_INTERVAL, |r| r.interval);
+                    let strategy: Option<String> = current_retry_policy.as_ref().map_or(None, |r| r.strategy.clone());
+                    debug!("retry policy with attempts {} time(s) and interval {} second(s) with strategy {:?}", attempts, interval, &strategy);
+                    let retried :u32;   // nubmer of (already) retried times
+                    // read meta, abort if reach max retry times, increment retried counter
                     {
                         let mut v = v.lock().unwrap();
                         let len = v.meta.path.len();
-                        let retried = v.meta.path[len-1].1;
+                        retried = v.meta.path[len-1].1;
                         debug!("step `{}` has already retried {} time(s).", current_step_name, retried);
-                        if retried >= max_retry {
+                        if retried >= attempts {
                             debug!("step `{}` has already retried {} time(s). abort!", current_step_name, retried);
                             break;
                         }
                         v.meta.path[len-1].1 = retried + 1;
                     }
+                    // calculate final retry interval for async sleeping
+                    let retry_interval = match strategy {
+                        Some(s) => { if s == "exp_backoff" { interval * (1 << retried) } else { interval } },
+                        None => interval,
+                    };
                     debug!("retrying after {} second(s).", retry_interval);
                     async_sleep(retry_interval).await;
                     retrying = true;
@@ -246,6 +259,15 @@ impl Freactor {
 
     fn next_id(&self) -> u64 {
         self.id_counter.fetch_add(1, Ordering::SeqCst)
+    }
+}
+
+
+impl fmt::Debug for Freactor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Freactor")
+            .field("flow_config", &self.flow_config)
+            .finish()
     }
 }
 

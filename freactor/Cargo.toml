@@ -1,6 +1,6 @@
 [package]
 name = "freactor"
-version = "0.1.6"
+version = "0.1.7"
 edition = "2021"
 authors = ["Paul Yang <paulyyangyang@gmail.com>"]
 description = "A lightweight framework for asynchronous execution flow."

@@ -8,7 +8,6 @@ use tokio::task::JoinSet;
 use serde_json::{Value, json};
 use rand::Rng;
 
-use reqwest;
 
 use freactor::{
     Code,
@@ -27,30 +26,17 @@ fn add_x(state: Arc<Mutex<State>>, x: i64) {
     }
 }
 
+
 fn print_state(state: Arc<Mutex<State>>, fn_name: &str) {
     let s = state.lock().unwrap();
     debug!("{} done with: {:?}, [{:?}]", fn_name, s.data.get("value").unwrap(), thread::current().id());
 }
 
-async fn call_http_api() -> Result<(), Box<dyn Error + Send>>{
-    let response = reqwest::get("https://ipinfo.io")
-    .await
-    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
-
-    let json: serde_json::Value = response
-        .json()
-        .await
-        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
-    let ip = json["ip"].as_str().unwrap_or("Unknown IP");
-    info!("IP Address: {}", ip);
-    Ok(())
-}
 
 async fn r1(state: Arc<Mutex<State>>) -> Result<Code, Box<dyn Error + Send>> {
     debug!("r1 processing...{:?}", thread::current().id());
 	time::sleep(time::Duration::from_secs(1)).await;
 
-    call_http_api().await?;
     add_x(state.clone(), 1);
     print_state(state, "r1");
 
@@ -66,7 +52,6 @@ async fn r1(state: Arc<Mutex<State>>) -> Result<Code, Box<dyn Error + Send>> {
 
     // Ok(Code::Success)
     // Ok(Code::Retry(Some("What?".to_string())))
-
 }
 
 
@@ -74,7 +59,6 @@ async fn r2(state: Arc<Mutex<State>>) -> Result<Code, Box<dyn Error + Send>> {
     debug!("r2 processing...{:?}", thread::current().id());
 	time::sleep(time::Duration::from_secs(1)).await;
 
-    // call_http_api().await?;
     add_x(state.clone(), 2);
     print_state(state, "r2");
 
@@ -95,7 +79,6 @@ async fn r3(state: Arc<Mutex<State>>) -> Result<Code, Box<dyn Error + Send>> {
     debug!("r3 processing...{:?}", thread::current().id());
 	time::sleep(time::Duration::from_secs(1)).await;
 
-    // call_http_api().await?;
     add_x(state.clone(), 3);
     print_state(state, "r3");
 
@@ -106,7 +89,6 @@ async fn r4(state: Arc<Mutex<State>>) -> Result<Code, Box<dyn Error + Send>> {
     debug!("r4 processing...{:?}", thread::current().id());
 	time::sleep(time::Duration::from_secs(1)).await;
 
-    // call_http_api().await?;
     add_x(state.clone(), 4);
     print_state(state, "r4");
 
@@ -117,11 +99,9 @@ async fn r5(state: Arc<Mutex<State>>) -> Result<Code, Box<dyn Error + Send>> {
     debug!("r5 processing...{:?}", thread::current().id());
 	time::sleep(time::Duration::from_secs(1)).await;
 
-    // call_http_api().await?;
     add_x(state.clone(), 5);
     print_state(state, "r5");
 
-    // Ok(Code::Success)
     Ok(Code::Failure(1, Some("Whoo".to_string())))
 }
 
@@ -129,7 +109,6 @@ async fn r6(state: Arc<Mutex<State>>) -> Result<Code, Box<dyn Error + Send>> {
     debug!("r6 processing...{:?}", thread::current().id());
 	time::sleep(time::Duration::from_secs(1)).await;
 
-    // call_http_api().await?;
     add_x(state.clone(), 6);
     print_state(state, "r6");
 
@@ -144,17 +123,28 @@ async fn _sleeper(id: i32) {
 }
 
 
-async fn run() {
+async fn run() -> Result<(), Box<dyn Error + Send>> {
     let flow_config = r#"
     {
-        "ExampleTask1": {
+        "Task1": {
+            "init_step": "r1",
+            "config": {
+                "r1": { "edges": ["r2", "r3", "r4"], "retry": {"attempts": 4, "interval": 1, "strategy": "exp_backoff"} },
+                "r2": { "edges": ["r5", "r3"], "retry": {"attempts": 2, "interval": 3}},
+                "r3": { "edges": ["r6", "r4"]},
+                "r4": { "edges": []},
+                "r5": { "edges": ["r6", "r3"]},
+                "r6": { "edges": [], "retry": null}
+            }
+        },
+        "Task2": {
             "init_step": "r1",
             "config": {
                 "r1": { "edges": ["r2", "r3", "r4"]},
                 "r2": { "edges": ["r5", "r3"]},
-                "r3": { "edges": ["r6", "r4"]},
+                "r3": { "edges": ["r4", "r6"]},
                 "r4": { "edges": []},
-                "r5": { "edges": ["r6", "r3"]},
+                "r5": { "edges": ["r6"]},
                 "r6": { "edges": [], "retry": null}
             }
         }
@@ -171,6 +161,7 @@ async fn run() {
         ("r6".to_string(), box_async_fn(r6)),
     ];
     let f = Freactor::new(func_map, flow_config); // ownership moved by design
+    info!("{:?}", f);
 
     // multi instance concurrently
     let mut shared_vecs: Vec<Arc<Mutex<State>>> = Vec::with_capacity(128);
@@ -187,8 +178,17 @@ async fn run() {
         // clone flow config for every spawn/req
         let fc = f.clone();
         jset.spawn(async move {
-            let _r =
-                fc.run("ExampleTask1", v).await;
+            /* NOTE: cannot random here, TBD
+            let mut rng = rand::thread_rng();
+            let r: i32 = ra.gen_range(0..10);
+            if r % 2 == 0 {
+                let _ = fc.run("Task1", v).await;
+            }
+            else {
+                let _ = fc.run("Task2", v).await;
+            }
+            */
+            let _r = fc.run("Task1", v).await;
         });
     }
     while let Some(_res) = jset.join_next().await {}
@@ -198,6 +198,8 @@ async fn run() {
         let vec = v.lock().unwrap();
         info!("Result: {:?}", *vec);
     }
+
+    Ok(())
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -211,7 +213,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .build().unwrap();
 
 	runtime.block_on(async move {
-		run().await;
+		let _ = run().await;
 	});
 
     Ok(())
