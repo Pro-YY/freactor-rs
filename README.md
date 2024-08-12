@@ -48,7 +48,7 @@ async r3() {}
 
 
 async run () {
-    // 1. Define business flow config 
+    // 1. Define business flow config
     let flow_config = r#"
     {
         "ExampleTask1": {
@@ -65,7 +65,7 @@ async run () {
     }
     "#.to_string();
 
-    // 2. Init freactor with funcs and config    
+    // 2. Init freactor with funcs and config
     let f = Freactor::new(func_map, flow_config);
 
     // 3. Prepare you workspace arc state, and run your flow later anywhere
@@ -81,12 +81,61 @@ Here are some examples to illustrate how to use freactor for different scenarios
 
 **Example 1: Multi-Threaded Parallel Execution**
 ```
-/* To be continued */
+// run with independent self data(state)
+
+async fn run() {
+    // function map and flow config here...
+    let f = Freactor::new(func_map, flow_config);
+
+    // multiple flow instance concurrently
+    let mut shared_vecs: Vec<Arc<Mutex<State>>> = Vec::with_capacity(10);
+    for i in 0..shared_vecs.capacity() {
+        let state = State::new(...);
+        shared_vecs.push(Arc::new(Mutex::new(state)));
+    }
+
+    let mut jset = JoinSet::new();
+    for v in shared_vecs.clone() {
+        let fc = f.clone();
+        jset.spawn(async move {
+            let _ = fc.run("Task1", v).await;
+        });
+    }
+    while let Some(_res) = jset.join_next().await {}
+
+    for v in shared_vecs {
+        let vec = v.lock().unwrap();
+        info!("Mutated Vec: {:?}", *vec);
+    }
+}
 ```
 
 **Example 2: HTTP Web Server Integration**
 ```
-/* To be continued */
+// with web framework, like Axum
+// just put freactor in shared server state (Extension/State) and run your task in handler
+
+async fn handle_task_1(Extension(f): Extension<Arc<Freactor>>) -> &'static str {
+    let v = Arc::new(Mutex::new(State::new(...)));
+    let _ = f.run("Task1", v).await;
+    "Hello, World!"
+}
+
+async fn main() {
+    // function map and flow config here...
+    let f = Freactor::new(func_map, flow_config);
+    let shared_server_state = Arc::new(f);
+
+    let app = Router::new()
+    .route("/", get(root))
+    .route("/1", get(handle_task_1))
+    .route("/2", get(handle_task_2))
+    .layer(Extension(shared_server_state));
+
+    // run our app with hyper, listening globally on port 3000
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    axum::serve(listener, app).await.unwrap();
+}
 ```
 
 

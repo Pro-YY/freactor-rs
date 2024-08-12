@@ -272,7 +272,7 @@ impl fmt::Debug for Freactor {
 }
 
 
-/*  */
+/* utility functions */
 pub fn version() -> String {
     let version = env!("CARGO_PKG_VERSION");
     let mut features = vec![];
@@ -290,29 +290,14 @@ pub fn version() -> String {
     v
 }
 
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
-
-pub fn sub(left: usize, right: usize) -> usize {
-    left - right
-}
-
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_add() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-
-    #[test]
-    fn test_sub() {
-        let result = sub(2, 2);
-        assert_eq!(result, 0);
+    fn test_version() {
+        assert_eq!(version().contains(env!("CARGO_PKG_VERSION")), true);
     }
 
 }
